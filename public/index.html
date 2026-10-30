@@ -111,7 +111,7 @@
   .field{margin-bottom:18px}
   .field:last-of-type{margin-bottom:0}
   label{display:block;font-size:13px;font-weight:600;margin-bottom:8px;color:#c9d5e6}
-  input[type="tel"],textarea,select{
+  input,textarea,select{
     width:100%;
     font-family:inherit;font-size:14.5px;color:var(--text);
     background:#0a111a;
@@ -169,6 +169,45 @@
   }
   .btn-ghost.is-live .rec{width:9px;height:9px;border-radius:50%;background:var(--red);animation:pulse .9s ease-in-out infinite}
   .fineprint{margin:12px 0 0;font-size:12.2px;color:var(--muted-2);text-align:center}
+
+  /* ---------- settings / API keys ---------- */
+  .settings{margin-top:22px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.022);overflow:hidden}
+  .settings summary{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:12px 14px;cursor:pointer;list-style:none;
+    font-size:13px;font-weight:650;color:#c9d5e6;
+    transition:background .15s ease;
+  }
+  .settings summary::-webkit-details-marker{display:none}
+  .settings summary:hover{background:rgba(255,255,255,.035)}
+  .sum-left{display:flex;align-items:center;gap:8px}
+  .sum-left svg{width:15px;height:15px;color:var(--cyan);flex:none}
+  .sum-state{
+    font-family:var(--mono);font-size:10.8px;font-weight:500;letter-spacing:.03em;
+    color:var(--muted-2);background:#0a111a;border:1px solid var(--line);
+    padding:3px 8px;border-radius:999px;white-space:nowrap;
+  }
+  .sum-state.has{color:#6ee7c7;border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.1)}
+  .settings[open] summary{border-bottom:1px solid var(--line-soft);color:var(--text)}
+  .settings .inner{padding:14px}
+  .warn{
+    margin:0 0 14px;padding:10px 12px;border-radius:10px;
+    font-size:12.4px;line-height:1.55;color:#fde8c0;
+    background:rgba(251,191,36,.09);border:1px solid rgba(251,191,36,.28);
+  }
+  .warn b{color:#ffd88a}
+  .opt{font-weight:500;font-size:11px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.07em;margin-left:5px}
+  .settings .field{margin-bottom:13px}
+  .settings-actions{display:flex;gap:9px;margin-top:6px}
+  .btn-mini{
+    flex:1;padding:9px 12px;border-radius:10px;border:1px solid transparent;
+    font:inherit;font-size:13.2px;font-weight:650;cursor:pointer;
+    background:linear-gradient(135deg,var(--cyan),#7dd3fc);color:#04121a;
+    transition:filter .15s ease,transform .12s ease;
+  }
+  .btn-mini.ghost{background:rgba(255,255,255,.05);border-color:var(--line);color:var(--muted)}
+  .btn-mini:hover{filter:brightness(1.07)}
+  .btn-mini:active{transform:translateY(1px)}
 
   .alert{
     display:flex;gap:10px;align-items:flex-start;
@@ -346,6 +385,48 @@
         <p class="fineprint" id="fineprint">Voice test runs free in your browser (Web Speech API) — no phone credits needed.</p>
       </form>
 
+      <details class="settings" id="settings">
+        <summary>
+          <span class="sum-left">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+            API keys &amp; settings
+          </span>
+          <span class="sum-state" id="keyState">none saved</span>
+        </summary>
+
+        <div class="inner">
+          <p class="warn">
+            Keys are kept <b>only in this browser</b> (localStorage) and sent with each request.
+            The server never stores them and never sends them back. Server <b>.env</b> values always
+            win — these are used only where the server has none. Paste personal test keys only, and
+            clear them on a shared device.
+          </p>
+
+          <div class="field">
+            <label for="kGemini">GEMINI_API_KEY</label>
+            <input id="kGemini" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…">
+          </div>
+          <div class="field">
+            <label for="kSid">TWILIO_ACCOUNT_SID<span class="opt">optional</span></label>
+            <input id="kSid" type="password" autocomplete="off" spellcheck="false" placeholder="AC…">
+          </div>
+          <div class="field">
+            <label for="kToken">TWILIO_AUTH_TOKEN<span class="opt">optional</span></label>
+            <input id="kToken" type="password" autocomplete="off" spellcheck="false" placeholder="your auth token">
+          </div>
+          <div class="field">
+            <label for="kFrom">TWILIO_PHONE_NUMBER<span class="opt">optional</span></label>
+            <input id="kFrom" type="tel" inputmode="tel" autocomplete="off" spellcheck="false" placeholder="+15005550006">
+          </div>
+
+          <div class="settings-actions">
+            <button type="button" class="btn-mini" id="saveKeys">Save keys</button>
+            <button type="button" class="btn-mini ghost" id="clearKeys">Clear all</button>
+          </div>
+          <p class="field-hint" id="keyHint">Nothing here is required — the server works on its own .env.</p>
+        </div>
+      </details>
+
     </div>
   </section>
 
@@ -393,7 +474,9 @@
     alert: $('alert'), alertText: $('alertText'),
     log: $('log'), empty: $('empty'),
     callStatus: $('callStatus'), modePill: $('modePill'), modeText: $('modeText'),
-    metaLeft: $('metaLeft'), metaRight: $('metaRight')
+    metaLeft: $('metaLeft'), metaRight: $('metaRight'),
+    keyState: $('keyState'), saveKeys: $('saveKeys'), clearKeys: $('clearKeys'),
+    keyHint: $('keyHint')
   };
 
   var LANGS = {
@@ -472,6 +555,65 @@
         ? 'Enter digits only, e.g. 9876543210 or +14155550123'
         : 'Dials ' + (els.cc.value || '+') + ' followed by the number';
     }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * API keys: stored in this browser only, sent with each request, and
+   * used by the server only where a .env value is missing.
+   * ------------------------------------------------------------------ */
+
+  var LS_PREFIX = 'pocketbandhu.';
+  var KEY_FIELDS = [
+    { id: 'kGemini', ls: 'GEMINI_API_KEY', body: 'geminiApiKey' },
+    { id: 'kSid',    ls: 'TWILIO_ACCOUNT_SID', body: 'twilioAccountSid' },
+    { id: 'kToken',  ls: 'TWILIO_AUTH_TOKEN',  body: 'twilioAuthToken' },
+    { id: 'kFrom',   ls: 'TWILIO_PHONE_NUMBER', body: 'twilioPhoneNumber' }
+  ];
+
+  function lsGet(name) {
+    try { return window.localStorage.getItem(LS_PREFIX + name) || ''; }
+    catch (e) { return ''; }
+  }
+  function lsSet(name, value) {
+    try {
+      if (value) window.localStorage.setItem(LS_PREFIX + name, value);
+      else window.localStorage.removeItem(LS_PREFIX + name);
+    } catch (e) { /* private mode: keys simply are not remembered */ }
+  }
+  function savedKeyCount() {
+    return KEY_FIELDS.filter(function (f) { return !!lsGet(f.ls); }).length;
+  }
+  function updateKeyState() {
+    var n = savedKeyCount();
+    els.keyState.textContent = n === 0 ? 'none saved' : (n + ' saved here');
+    if (n) els.keyState.classList.add('has');
+    else els.keyState.classList.remove('has');
+    els.keyHint.textContent = n === 0
+      ? 'Nothing here is required — the server works on its own .env.'
+      : n + ' key' + (n === 1 ? '' : 's') + ' stored in this browser. Server .env values still win.';
+  }
+  function loadKeyForm() {
+    KEY_FIELDS.forEach(function (f) { $(f.id).value = lsGet(f.ls); });
+    updateKeyState();
+  }
+  /** Only non-empty keys travel with a request; the server ignores any it already has. */
+  function collectKeys() {
+    var out = {};
+    KEY_FIELDS.forEach(function (f) {
+      var v = lsGet(f.ls);
+      if (v) out[f.body] = v;
+    });
+    return out;
+  }
+  function saveKeys() {
+    KEY_FIELDS.forEach(function (f) { lsSet(f.ls, $(f.id).value.trim()); });
+    updateKeyState();
+    showAlert('Keys saved in this browser. Server .env values still take priority.', 'info');
+  }
+  function clearKeys() {
+    KEY_FIELDS.forEach(function (f) { lsSet(f.ls, ''); $(f.id).value = ''; });
+    updateKeyState();
+    showAlert('Saved keys removed from this browser.', 'info');
   }
 
   /* ------------------------------------------------------------------ *
@@ -567,14 +709,15 @@
     setStatus('Connecting…', 'busy');
 
     try {
+      var payload = collectKeys();
+      payload.phone = to;
+      payload.persona = els.persona.value;
+      payload.language = langKey();
+
       var res = await fetch('/api/make-call', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: to,
-          persona: els.persona.value,
-          language: langKey()
-        })
+        body: JSON.stringify(payload)
       });
       var data = await res.json().catch(function () { return {}; });
       if (!res.ok) throw new Error(data.error || ('Request failed (' + res.status + ')'));
@@ -778,15 +921,16 @@
     }).slice(0, -1); // drop the utterance we are about to send
 
     try {
+      var payload = collectKeys();
+      payload.message = text;
+      payload.persona = els.persona.value;
+      payload.language = langKey();
+      payload.history = history;
+
       var res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          persona: els.persona.value,
-          language: langKey(),
-          history: history
-        })
+        body: JSON.stringify(payload)
       });
       var data = await res.json().catch(function () { return {}; });
       if (!res.ok) throw new Error(data.error || ('Request failed (' + res.status + ')'));
@@ -820,6 +964,8 @@
 
   els.phone.addEventListener('input', updatePhoneHint);
   els.cc.addEventListener('change', updatePhoneHint);
+  els.saveKeys.addEventListener('click', saveKeys);
+  els.clearKeys.addEventListener('click', clearKeys);
 
   els.language.addEventListener('change', function () {
     els.langBadge.textContent = langCode();
@@ -837,6 +983,7 @@
   }
 
   updatePhoneHint();
+  loadKeyForm();
   els.langBadge.textContent = langCode();
   render();
 })();

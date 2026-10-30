@@ -1,0 +1,45 @@
+# ---------------------------------------------------------------------------
+# Pocketbandhu - Render Blueprint
+#
+# One-click deploy:  https://render.com/deploy?repo=https://github.com/amar768581/Pocketbandhu
+# (Render reads this file and offers to create the service + env vars.)
+#
+# Every secret below is prompted for during the Blueprint flow (sync: false).
+# They are optional: the dashboard's "API keys & settings" panel can supply
+# any that are missing, directly from the browser.
+# ---------------------------------------------------------------------------
+services:
+  - type: web
+    name: pocketbandhu
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+      # Public base URL used for the Twilio webhooks (/api/voice, /api/respond,
+      # /api/status). Self-referenced so it always matches this service's own
+      # https:// URL - no editing needed.
+      - key: PUBLIC_URL
+        fromService:
+          type: web
+          name: pocketbandhu
+          envVarKey: RENDER_EXTERNAL_URL
+
+      # --- secrets: fill these in when the Blueprint is created -------------
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+
+      # --- optional tuning (safe defaults already live in server.js) --------
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash

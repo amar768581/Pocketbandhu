@@ -96,25 +96,45 @@ function langFor(job) {
  * serve the dashboard when credentials are missing)
  * ------------------------------------------------------------------------ */
 
-let twilioClient = null;
+const twilioClients = new Map();
 
-function getTwilioClient() {
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
-    const err = new Error('Twilio is not configured. Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN.');
+/** Trim a value coming from the client without ever logging it. */
+function cleanStr(value) {
+  return value == null ? '' : String(value).trim();
+}
+
+/**
+ * Build (and cache) a Twilio REST client. Server .env credentials win; when
+ * they are missing, the values pasted into the dashboard's Settings panel are
+ * used for this request only and are never stored by the server.
+ */
+function getTwilioClient(accountSid, authToken) {
+  if (!accountSid || !authToken) {
+    const err = new Error(
+      'Twilio is not configured. Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN on the server, or add them in Settings -> API keys in the dashboard.'
+    );
     err.status = 500;
     throw err;
   }
-  if (!twilioClient) twilioClient = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-  return twilioClient;
+  const cacheKey = `${accountSid}|${authToken}`;
+  if (!twilioClients.has(cacheKey)) {
+    if (twilioClients.size >= 8) twilioClients.clear(); // bound the cache
+    twilioClients.set(cacheKey, twilio(accountSid, authToken));
+  }
+  return twilioClients.get(cacheKey);
 }
 
 /**
  * Ask Gemini for the next thing the agent should say.
  * Keeps replies short and speech-friendly because the text is read aloud.
  */
-async function askGemini({ persona, language, transcript, userText }) {
-  if (!GEMINI_API_KEY) {
-    const err = new Error('Gemini is not configured. Set GEMINI_API_KEY.');
+async function askGemini({ persona, language, transcript, userText, apiKey }) {
+  // Server .env always wins; a key pasted into the dashboard fills the gap.
+  const key = GEMINI_API_KEY || cleanStr(apiKey);
+  if (!key) {
+    const err = new Error(
+      'Gemini is not configured. Set GEMINI_API_KEY on the server, or add it in Settings -> API keys in the dashboard.'
+    );
     err.status = 500;
     throw err;
   }
@@ -160,7 +180,7 @@ async function askGemini({ persona, language, transcript, userText }) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-goog-api-key': GEMINI_API_KEY,
+      'x-goog-api-key': key,
     },
     body: JSON.stringify({
       systemInstruction: { parts: systemParts.map((text) => ({ text })) },
@@ -215,12 +235,15 @@ const jobs = new Map();
 /** Twilio CallSid -> jobId */
 const sessions = new Map();
 
-function createJob({ persona, language }) {
+function createJob({ persona, language, apiKey }) {
   const id = crypto.randomBytes(8).toString('hex');
   const job = {
     id,
     persona: String(persona || '').trim() || DEFAULT_PERSONA,
     language: langKey(language),
+    // Client-supplied Gemini key, kept in memory for this call only so
+    // /api/respond can answer without a server-side GEMINI_API_KEY.
+    geminiKey: cleanStr(apiKey) || null,
     status: 'created',
     transcript: [],
     callSid: null,
@@ -394,7 +417,13 @@ app.post('/api/chat', async (req, res) => {
     : [];
 
   try {
-    const reply = await askGemini({ persona, language, transcript, userText: message });
+    const reply = await askGemini({
+      persona,
+      language,
+      transcript,
+      userText: message,
+      apiKey: cleanStr(body.geminiApiKey),
+    });
     res.json({ reply, language });
   } catch (err) {
     console.error('Gemini error:', err.message);
@@ -416,19 +445,32 @@ app.post('/api/make-call', async (req, res) => {
       error: 'Enter a valid phone number, e.g. 9876543210 (a +91 prefix is added for you) or +14155550123.',
     });
   }
-  if (!TWILIO_PHONE_NUMBER) {
-    return res.status(500).json({ error: 'Set TWILIO_PHONE_NUMBER in your environment.' });
+  const job = createJob({
+    persona: body.persona,
+    language: body.language,
+    apiKey: cleanStr(body.geminiApiKey),
+  });
+
+  // Server .env wins; dashboard-supplied values fill any gap.
+  const from = TWILIO_PHONE_NUMBER || cleanStr(body.twilioPhoneNumber);
+  const accountSid = TWILIO_ACCOUNT_SID || cleanStr(body.twilioAccountSid);
+  const authToken = TWILIO_AUTH_TOKEN || cleanStr(body.twilioAuthToken);
+
+  if (!from) {
+    jobs.delete(job.id);
+    return res.status(500).json({
+      error:
+        'No calling number. Set TWILIO_PHONE_NUMBER on the server, or add it in Settings -> API keys in the dashboard.',
+    });
   }
 
-  const job = createJob({ persona: body.persona, language: body.language });
-
   try {
-    const client = getTwilioClient();
+    const client = getTwilioClient(accountSid, authToken);
     const origin = baseUrl(req);
 
     const call = await client.calls.create({
       to,
-      from: TWILIO_PHONE_NUMBER,
+      from,
       url: `${origin}/api/voice?job=${job.id}`,
       method: 'POST',
       statusCallback: `${origin}/api/status?job=${job.id}`,
@@ -545,6 +587,7 @@ app.all('/api/respond', async (req, res) => {
       language: job.language,
       transcript: job.transcript.slice(0, -1),
       userText: speech,
+      apiKey: job.geminiKey,
     });
     job.lastError = null;
   } catch (err) {
@@ -617,4 +660,5 @@ app.listen(Number(PORT), '0.0.0.0', () => {
   console.log(`  Gemini: ${GEMINI_API_KEY ? 'configured' : 'MISSING GEMINI_API_KEY'}`);
   console.log(`  Twilio: ${twilioState}`);
   console.log(`  Public URL: ${PUBLIC_URL || '(derived from each request)'}\n`);
+  console.log('  Dashboard Settings panel can supply any key that is missing here.\n');
 });

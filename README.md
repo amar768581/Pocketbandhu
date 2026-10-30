@@ -33,6 +33,8 @@ Browser voice test ──► /api/chat ──► Gemini ──► Web Speech syn
 | Browser testing | `POST /api/chat` + Web Speech API = free, no-SIM testing of any persona |
 | Dashboard | Dark, mobile-friendly UI: number field (+91 prefix), persona textarea, language selector, two buttons, live transcript |
 | Call status | Twilio status callbacks + `GET /api/call/:jobId` feed the live transcript and status pill |
+| API keys panel | Paste `GEMINI_API_KEY` and the optional Twilio credentials in the browser (localStorage) — used wherever the server has no `.env` |
+| 1-click deploy | `render.yaml` blueprint + the Render deploy button |
 
 ---
 
@@ -106,27 +108,33 @@ calling (handy behind ngrok/Render), but setting it explicitly is safer.
 
 ---
 
-## 5. Deploy to Render
+## 5. Deploy to Render (1-click)
 
-1. Push this repository to GitHub.
-2. In Render: **New → Web Service → Connect** your repository.
-3. Settings:
-   * **Runtime**: Node
-   * **Build Command**: `npm install`
-   * **Start Command**: `npm start`
-4. Add the environment variables (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
-   `TWILIO_PHONE_NUMBER`, `GEMINI_API_KEY`, `PUBLIC_URL`, …) either as individual keys or
-   in an Environment Group.
-5. Deploy. Your `PUBLIC_URL` is now `https://your-service.onrender.com` — update it and
-   redeploy (or set it in the environment group) so the TwiML and status-callback URLs point
-   at the live service.
-6. Open `https://your-service.onrender.com`, enter a number, press **Call phone number**.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/amar768581/Pocketbandhu)
+
+The repo ships a [`render.yaml`](render.yaml) blueprint, so Render does the configuration
+for you:
+
+1. Click the button above (or **New → Blueprint** in the Render dashboard and pick this repo).
+2. Render reads `render.yaml` and offers to create a **free** Node web service with
+   `npm install` / `npm start` and `healthCheckPath: /`.
+3. It asks for the four secrets (`GEMINI_API_KEY`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
+   `TWILIO_PHONE_NUMBER`) — each is marked `sync: false`, so you type them in during setup.
+   **You can skip them all** and paste them later in the dashboard's *API keys & settings* panel.
+4. `PUBLIC_URL` is wired automatically: the blueprint self-references the service's own
+   `RENDER_EXTERNAL_URL`, so the TwiML and status-callback URLs always match the deployed
+   origin — no manual editing or redeploy loop.
+5. Open `https://pocketbandhu.onrender.com`, enter a number, press **Call phone number**.
+
+Manual alternative: **New → Web Service → Connect repo**, Runtime *Node*, build
+`npm install`, start `npm start`, then add the env vars yourself.
 
 > **Heads-up:** Render's free tier sleeps after inactivity, so the first call after idle can
 > fail or take ~30 s to wake the service. Use a paid/stable instance for real calling.
 
 Any other host works the same way (Railway, Fly.io, a VPS…): run `npm start` and set
-`PUBLIC_URL` to the public `https://` origin.
+`PUBLIC_URL` to the public `https://` origin. Without `PUBLIC_URL` the server derives the
+origin from each incoming Twilio request, which also works behind a proxy.
 
 ---
 
@@ -139,6 +147,22 @@ Any other host works the same way (Railway, Fly.io, a VPS…): run `npm start` a
   *"You are Pocketbandhu, a friendly assistant speaking in Bengali and English."*
 * **Language** — sets Twilio's recognition language, the `<Say>` language, and the language
   Gemini replies in.
+* **API keys & settings** (collapsible panel at the bottom of the controls) — paste your
+  `GEMINI_API_KEY` and, if you like, `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` /
+  `TWILIO_PHONE_NUMBER`, then press **Save keys**.
+
+  How it behaves:
+
+  * Keys are stored in **this browser only** (`localStorage`) and sent along with
+    `/api/chat` and `/api/make-call`. The server uses them **only for values missing from
+    its own `.env`** — a server-side value always wins — and never writes them to disk,
+    logs or responses.
+  * During a phone call the Gemini key is held **in memory for that call only**, so
+    `/api/respond` can answer; it is dropped when the call transcript expires.
+  * Nothing here is mandatory: with no browser keys the app runs purely on `.env`.
+  * Treat it as a personal-testing convenience. `localStorage` is readable by any script
+    running on the page, so use test keys, and press **Clear all** on a shared machine.
+    For production, prefer keeping every secret in the server's `.env` / Render env vars.
 * **Call phone number** — real outbound call through Twilio (uses your Twilio balance).
 * **Test voice in browser** — speak into your mic; the browser transcribes it, `/api/chat`
   asks Gemini, and the reply is spoken back with `speechSynthesis`. Free, no credits.
