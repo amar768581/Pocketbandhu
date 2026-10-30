@@ -8,6 +8,11 @@ keeping the conversation looping until the call ends.
 It also lets you **test the whole agent for free in your browser** with the Web Speech API
 (speech recognition in, speech synthesis out), so you never need phone credits to try a persona.
 
+The backend is a single **[Hono](https://hono.dev)** app, so the identical code runs in two
+places: as a **Cloudflare Worker on Freebuff Sites** (D1 for session storage) and as a **Node
+service on Render** (in-memory storage). Twilio and Gemini are both called with plain `fetch` —
+no SDKs.
+
 ```
 Browser dashboard ──► POST /api/make-call ──► Twilio dials the phone
                                                  │
@@ -34,15 +39,17 @@ Browser voice test ──► /api/chat ──► Gemini ──► Web Speech syn
 | Dashboard | Dark, mobile-friendly UI: number field (+91 prefix), persona textarea, language selector, two buttons, live transcript |
 | Call status | Twilio status callbacks + `GET /api/call/:jobId` feed the live transcript and status pill |
 | API keys panel | Paste `GEMINI_API_KEY` and the optional Twilio credentials in the browser (localStorage) — used wherever the server has no `.env` |
-| 1-click deploy | `render.yaml` blueprint + the Render deploy button |
+| 1-click deploy | `render.yaml` blueprint for Render, `sites.manifest.json` + esbuild bundle for Sites |
+| Runs anywhere | One Hono app: Cloudflare Workers (Sites) or Node (Render, local) |
 
 ---
 
 ## 1. Requirements
 
-* **Node.js 20+** (the server uses the built-in `fetch`)
 * A **Twilio** account — <https://console.twilio.com>
 * A **Google Gemini API key** — <https://aistudio.google.com/apikey>
+* **Node.js 20+** for local development and the Render deployment (the Sites deployment is a
+  prebuilt bundle and needs nothing installed)
 
 ---
 
@@ -108,7 +115,30 @@ calling (handy behind ngrok/Render), but setting it explicitly is safer.
 
 ---
 
-## 5. Deploy to Render (1-click)
+## 5. Deploy to Freebuff Sites (Cloudflare Workers)
+
+**Live preview (published):**
+<https://site-d6ee9666b7a54f649164915a4d2a74f2.freebuff.page>
+
+Because the backend is Hono, the same `src/app.js` runs on Workers:
+
+* `npm run build` bundles `worker.js` with esbuild into `dist/worker.js` (no `twilio` or
+  `express` runtime — Twilio and Gemini are plain `fetch` calls).
+* `sites.manifest.json` ships that bundle plus `public/` as static assets.
+* Session state lives in **D1** (binding `DB`), so a conversation survives isolate switches
+  while Twilio walks the webhook loop. The schema (`jobs`, `turns`, `aliases`) is created
+  automatically on first use — no migrations to run.
+* Without the binding (Node/local) the store falls back to in-memory `Map`s, so nothing has
+  to be configured.
+
+To redeploy: `npm run build`, then publish the new build from the Sites panel. Twilio can hit
+`/api/voice`, `/api/respond` and `/api/status` directly on the public URL — no tunnel needed.
+Paste your keys in **API keys & settings** on first visit, or store them as site secrets
+(Sites → Secrets) so every visitor shares them.
+
+---
+
+## 6. Deploy to Render (1-click)
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/amar768581/Pocketbandhu)
 
@@ -138,7 +168,7 @@ origin from each incoming Twilio request, which also works behind a proxy.
 
 ---
 
-## 6. Using the dashboard
+## 7. Using the dashboard
 
 * **Phone number** — type 10 digits and the `+91` prefix is added automatically; pick another
   country code, or choose *Full number* and type the whole thing including `+`.
@@ -173,7 +203,7 @@ The right-hand panel streams the transcript live: phone turns are polled from
 
 ---
 
-## 7. API reference
+## 8. API reference
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -194,21 +224,33 @@ curl -X POST http://localhost:3000/api/chat \
 
 ---
 
-## 8. Project structure
+## 9. Project structure
 
 ```
 pocketbandhu/
-├── server.js          # Express app: Twilio webhooks, Gemini client, session store
+├── worker.js           # Cloudflare Workers entry (Sites)
+├── server.js           # Node entry: .env + static files (Render / local)
+├── src/
+│   ├── app.js          # Hono app: every route, TwiML webhooks, JSON APIs
+│   ├── ai.js           # Gemini generateContent over fetch
+│   ├── twilio.js       # Twilio Calls REST over fetch
+│   ├── store.js        # D1 store (Workers) + in-memory store (Node)
+│   ├── twiml.js        # <Gather>/<Say>/<Redirect>/<Hangup> builders
+│   └── shared.js       # languages, prompts, phone normalisation, helpers
 ├── public/
-│   └── index.html     # Dark mobile-first dashboard + Web Speech voice test
+│   └── index.html      # Dark mobile-first dashboard + Web Speech voice test
+├── dist/worker.js      # esbuild bundle uploaded to Sites (generated)
+├── sites.manifest.json # Freebuff Sites deploy manifest
+├── wrangler.jsonc      # local workerd + D1 testing (`npm run dev:workers`)
+├── render.yaml         # Render Blueprint
 ├── package.json
-├── .env.example       # copy to .env and fill in
+├── .env.example        # copy to .env for the Node/Render run
 └── README.md
 ```
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 | Symptom | Fix |
 | --- | --- |
@@ -222,14 +264,17 @@ pocketbandhu/
 
 ---
 
-## 10. Notes & limits
+## 11. Notes & limits
 
-* Conversation state lives **in memory**, keyed per call, and is swept after an hour —
-  restart the process and active transcripts are gone (the call itself keeps going with
-  default settings).
-* Twilio webhook signature validation is intentionally not enforced so local tunnels keep
-  working; add `twilio.validateRequest(...)` on `/api/voice`, `/api/respond` and
-  `/api/status` before handling sensitive traffic in production.
+* Conversation state lives **in D1** on Sites and **in memory** on Node; both are swept an
+  hour after the last activity. A Node restart drops active transcripts (the call keeps going
+  with default settings).
+* On Sites, a Gemini key pasted into the dashboard is held in that call's D1 row so
+  `/api/respond` can answer. No endpoint ever returns it, and it disappears with the
+  transcript — deployment-level keys (site secrets / `.env`) are never stored per call.
+* Twilio webhook signature validation is intentionally not enforced so preview URLs and local
+  tunnels keep working; verify the `X-Twilio-Signature` header against your auth token on
+  `/api/voice`, `/api/respond` and `/api/status` before handling sensitive traffic in production.
 * Gemini replies are capped at ~150 output tokens and trimmed to 600 characters because
   they are read aloud by a phone voice.
 * Each call spends real Twilio minutes and Gemini tokens.

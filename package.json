@@ -1,12 +1,15 @@
 {
   "name": "pocketbandhu",
-  "version": "1.0.0",
-  "description": "Pocketbandhu - an AI Calling Agent built with Node.js, Express, Twilio Voice and Google Gemini.",
+  "version": "2.0.0",
+  "description": "Pocketbandhu - an AI Calling Agent built with Hono, Twilio Voice and Google Gemini. Runs on Cloudflare Workers (Sites) and on Node (Render).",
   "main": "server.js",
+  "type": "module",
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "build": "esbuild worker.js --bundle --format=esm --platform=browser --target=es2022 --conditions=workerd --outfile=dist/worker.js",
+    "dev:workers": "npm run build && wrangler dev --config wrangler.jsonc"
   },
   "engines": {
     "node": ">=20"
@@ -15,15 +18,20 @@
     "twilio",
     "voice",
     "gemini",
+    "hono",
+    "cloudflare-workers",
     "ai-agent",
     "bengali",
-    "hindi",
-    "express"
+    "hindi"
   ],
   "license": "MIT",
   "dependencies": {
-    "dotenv": "^16.4.7",
-    "express": "^5.1.0",
-    "twilio": "^6.2.0"
+    "@hono/node-server": "^2.1.5",
+    "dotenv": "^16.6.1",
+    "hono": "^4.13.14"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "wrangler": "^4.156.0"
   }
 }

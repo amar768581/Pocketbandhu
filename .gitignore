@@ -6,6 +6,10 @@ node_modules/
 .env.local
 .env.*.local
 
+# build output (npm run build)
+dist/
+.wrangler/
+
 # logs & runtime
 *.log
 *.pid

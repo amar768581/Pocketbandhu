@@ -1,0 +1,19 @@
+{
+  // Local dev / test config for `npm run dev:workers`.
+  // The deployed site is built from the Freebuff Sites manifest, not this file.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "pocketbandhu",
+  "main": "dist/worker.js",
+  "compatibility_date": "2026-01-15",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pocketbandhu",
+      "database_id": "00000000-0000-0000-0000-000000000000"
+    }
+  ]
+}
