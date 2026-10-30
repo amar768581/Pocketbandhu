@@ -1,0 +1,29 @@
+{
+  "name": "pocketbandhu",
+  "version": "1.0.0",
+  "description": "Pocketbandhu - an AI Calling Agent built with Node.js, Express, Twilio Voice and Google Gemini.",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "twilio",
+    "voice",
+    "gemini",
+    "ai-agent",
+    "bengali",
+    "hindi",
+    "express"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "twilio": "^6.2.0"
+  }
+}
