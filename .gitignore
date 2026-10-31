@@ -10,6 +10,12 @@ node_modules/
 dist/
 .wrangler/
 
+# github device auth (transient, never committed)
+.gh-device.json
+ghauth.status
+ghcode.txt
+gh-auth-flow.sh
+
 # logs & runtime
 *.log
 *.pid
