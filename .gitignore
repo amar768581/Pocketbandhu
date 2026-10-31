@@ -25,3 +25,13 @@ npm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# browser session store (potentially personal user data — never commit)
+*.sessions.json
+sessions.json
+pocketbandhu.sessions
+pocketbandhu*.*session*
+*_sessions.json
+
+# node build artifacts
+dist/
